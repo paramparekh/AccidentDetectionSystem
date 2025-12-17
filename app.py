@@ -19,7 +19,7 @@ app.config.from_object(Config)
 CORS(app)
 
 # Initialize SocketIO
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 # Initialize components
 simulator = TrafficSimulator()
@@ -229,12 +229,13 @@ def handle_update_config(data):
 
 
 if __name__ == '__main__':
+    import os
+    port = int(os.environ.get('PORT', 5000))
     print("=" * 60)
-    print("Traffic Accident Detection System - Demo Mode")
+    print("Traffic Accident Detection System - Production Mode")
     print("=" * 60)
-    print(f"Server starting on http://localhost:5000")
-    print("Open your browser and navigate to the URL above")
+    print(f"Server starting on port {port}")
     print("=" * 60)
     
     # Run with SocketIO
-    socketio.run(app, host='0.0.0.0', port=5000, debug=True, use_reloader=False)
+    socketio.run(app, host='0.0.0.0', port=port, debug=False)

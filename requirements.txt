@@ -7,3 +7,4 @@ statsmodels==0.14.1
 pandas==2.1.4
 python-socketio==5.10.0
 eventlet==0.33.3
+gunicorn==21.2.0
