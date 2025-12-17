@@ -164,12 +164,12 @@ class PageHinkleyDetector:
         self.min_sum = 0.0
 
 
-class AccidentDetector:
+class DetectorSuite:
     """
-    Main accident detection pipeline
-    Combines multiple sequential tests for robust detection
+    Holds the state of detectors for a single car
     """
-    def __init__(self):
+    def __init__(self, car_id):
+        self.car_id = car_id
         self.arima = ARIMAPredictor()
         self.cusum = CUSUMDetector()
         self.sprt = SPRTDetector()
@@ -179,81 +179,116 @@ class AccidentDetector:
         self.accident_active = False
         self.accident_start_time = None
         self.accident_id = None
+
+    def reset_detectors(self):
+        self.cusum.reset()
+        self.sprt.reset()
+        self.page_hinkley.reset()
+
+
+class AccidentDetector:
+    """
+    Main accident detection pipeline
+    Manages multiple DetectorSuite instances (one per car)
+    """
+    def __init__(self):
+        # Dictionary mapping car_id -> DetectorSuite
+        self.detectors = {}
         
-    def process_speed(self, speed_data):
+    def get_or_create_suite(self, car_id):
+        if car_id not in self.detectors:
+            self.detectors[car_id] = DetectorSuite(car_id)
+        return self.detectors[car_id]
+
+    def reset_all(self):
+        """Reset all detector suites"""
+        for suite in self.detectors.values():
+            suite.accident_active = False
+            suite.reset_detectors()
+
+    def reset_car(self, car_id):
+        """Reset detectors for a specific car"""
+        if car_id in self.detectors:
+            self.detectors[car_id].accident_active = False
+            self.detectors[car_id].reset_detectors()
+
+    def process_speed(self, speed_data_list):
         """
-        Process incoming speed data through all detectors
-        Returns: detection result dict
+        Process incoming speed data for MULTIPLE cars
+        Returns: list of detection results
         """
-        speed = speed_data['speed']
-        timestamp = speed_data['timestamp']
+        results = []
         
-        # Update history
-        self.speed_history.append(speed_data)
-        self.arima.update(speed)
-        
-        # Get prediction
-        predicted_speed = self.arima.predict()
-        
-        # Run all detectors
-        cusum_stat, cusum_alert = self.cusum.update(speed, predicted_speed)
-        sprt_ratio, sprt_decision = self.sprt.update(speed)
-        ph_stat, ph_alert = self.page_hinkley.update(speed)
-        
-        # Voting mechanism: require 2/3 tests to agree
-        alerts = [cusum_alert, sprt_decision == 'accident', ph_alert]
-        vote_count = sum(alerts)
-        
-        # WARM-UP PERIOD: Require minimum samples before detection
-        # This prevents false positives when system starts with insufficient data
-        has_enough_data = len(self.speed_history) >= Config.MIN_SAMPLES_FOR_DETECTION
-        
-        # Determine if accident detected (only if we have enough data)
-        accident_detected = has_enough_data and vote_count >= Config.REQUIRE_VOTES
-        
-        # Calculate confidence
-        confidence = vote_count / 3.0
-        
-        # Update accident state
-        if accident_detected and not self.accident_active:
-            # New accident detected
-            self.accident_active = True
-            self.accident_start_time = timestamp
-            self.accident_id = f"acc_{int(np.random.random() * 10000)}"
+        # Ensure input is a list (handle legacy single-dict if necessary, though simulator is updated)
+        if not isinstance(speed_data_list, list):
+            speed_data_list = [speed_data_list]
             
-        elif not accident_detected and self.accident_active:
-            # Check if accident cleared (need sustained normal speeds)
-            recent_speeds = [d['speed'] for d in list(self.speed_history)[-5:]]
-            if len(recent_speeds) >= 5 and np.mean(recent_speeds) > 40:
-                # Accident cleared
-                self.accident_active = False
-                # Reset detectors
-                self.cusum.reset()
-                self.sprt.reset()
-                self.page_hinkley.reset()
-        
-        return {
-            'timestamp': timestamp,
-            'speed': speed,
-            'predicted_speed': round(predicted_speed, 2),
-            'cusum_stat': round(cusum_stat, 2),
-            'sprt_ratio': round(sprt_ratio, 2),
-            'ph_stat': round(ph_stat, 2),
-            'cusum_alert': cusum_alert,
-            'sprt_alert': sprt_decision == 'accident',
-            'ph_alert': ph_alert,
-            'accident_detected': accident_detected,
-            'accident_active': self.accident_active,
-            'accident_id': self.accident_id,
-            'confidence': round(confidence, 2),
-            'vote_count': vote_count
-        }
+        for data in speed_data_list:
+            car_id = data.get('car_id', 'unknown')
+            suite = self.get_or_create_suite(car_id)
+            
+            speed = data['speed']
+            timestamp = data['timestamp']
+            
+            # Update history
+            suite.speed_history.append(data)
+            suite.arima.update(speed)
+            
+            # Get prediction
+            predicted_speed = suite.arima.predict()
+            
+            # Run all detectors
+            cusum_stat, cusum_alert = suite.cusum.update(speed, predicted_speed)
+            sprt_ratio, sprt_decision = suite.sprt.update(speed)
+            ph_stat, ph_alert = suite.page_hinkley.update(speed)
+            
+            # Voting mechanism
+            alerts = [cusum_alert, sprt_decision == 'accident', ph_alert]
+            vote_count = sum(alerts)
+            
+            # WARM-UP PERIOD
+            has_enough_data = len(suite.speed_history) >= Config.MIN_SAMPLES_FOR_DETECTION
+            
+            # Determine if accident detected
+            accident_detected = bool(has_enough_data and vote_count >= Config.REQUIRE_VOTES)
+            
+            confidence = vote_count / 3.0
+            
+            # Update accident state
+            if accident_detected and not suite.accident_active:
+                suite.accident_active = True
+                suite.accident_start_time = timestamp
+                suite.accident_id = f"acc_{car_id}_{int(np.random.random() * 1000)}"
+                
+            elif not accident_detected and suite.accident_active:
+                # Check if cleared
+                recent_speeds = [d['speed'] for d in list(suite.speed_history)[-5:]]
+                if len(recent_speeds) >= 5 and np.mean(recent_speeds) > 40:
+                    suite.accident_active = False
+                    suite.reset_detectors()
+            
+            results.append({
+                'car_id': car_id,
+                'timestamp': timestamp,
+                'speed': speed,
+                'predicted_speed': round(predicted_speed, 2),
+                'cusum_stat': round(cusum_stat, 2),
+                'sprt_ratio': round(sprt_ratio, 2),
+                'ph_stat': round(ph_stat, 2),
+                'accident_detected': accident_detected,
+                'accident_active': suite.accident_active,
+                'accident_id': suite.accident_id,
+                'confidence': round(confidence, 2)
+            })
+            
+        return results
     
     def get_status(self):
-        """Get current detection status"""
-        return {
-            'accident_active': self.accident_active,
-            'accident_id': self.accident_id,
-            'accident_start_time': self.accident_start_time,
-            'buffer_size': len(self.speed_history)
-        }
+        """Get status summary for all cars"""
+        status = {}
+        for car_id, suite in self.detectors.items():
+            status[car_id] = {
+                'accident_active': suite.accident_active,
+                'history_len': len(suite.speed_history)
+            }
+        return status

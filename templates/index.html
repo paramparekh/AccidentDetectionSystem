@@ -1,32 +1,35 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Traffic Accident Detection System</title>
-    
+
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    
+
     <!-- Leaflet CSS for Map -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    
+
     <!-- Custom CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/index.css') }}">
 </head>
+
 <body>
     <!-- Header -->
     <header class="header">
         <div class="header-content">
-            <div class="logo">
-                <span class="logo-icon">🚦</span>
-                <h1>Traffic Accident Detection</h1>
-            </div>
-            <div class="status-badge" id="statusBadge">
-                <span class="status-dot"></span>
-                <span id="statusText">All Clear</span>
+            <h1><i class="fas fa-traffic-light"></i> Traffic Accident Detection</h1>
+            <div class="header-actions">
+                <button id="helpBtn" class="btn btn-secondary"><i class="fas fa-question-circle"></i> Theory &
+                    Help</button>
+                <div class="status-indicator" id="statusBadge">
+                    <span class="status-dot"></span>
+                    System Normal
+                </div>
             </div>
         </div>
     </header>
@@ -35,100 +38,110 @@
     <div class="container">
         <!-- Control Panel -->
         <div class="control-panel">
-            <div class="controls">
-                <button class="btn btn-primary" id="startBtn">
-                    <span>▶️</span>
-                    <span>Start Monitoring</span>
-                </button>
-                <button class="btn btn-danger" id="stopBtn" disabled>
-                    <span>⏸️</span>
-                    <span>Stop Monitoring</span>
-                </button>
-                <button class="btn btn-warning" id="injectBtn" disabled>
-                    <span>⚠️</span>
-                    <span>Inject Accident (Demo)</span>
-                </button>
-                <button class="btn btn-primary" id="clearBtn" disabled>
-                    <span>✅</span>
-                    <span>Clear Accident</span>
-                </button>
+            <div class="controls-group">
+                <div class="control-label">Simulation Controls</div>
+                <div class="controls">
+                    <button class="btn btn-primary" id="startBtn">
+                        <span class="btn-icon">▶️</span>
+                        <span>Start Simulation</span>
+                    </button>
+                    <button class="btn btn-danger" id="stopBtn" disabled>
+                        <span class="btn-icon">⏸️</span>
+                        <span>Stop</span>
+                    </button>
+                    <button class="btn btn-warning" id="injectBtn" disabled>
+                        <span class="btn-icon">⚠️</span>
+                        <span>Inject Accident</span>
+                    </button>
+                    <button class="btn btn-success" id="clearBtn" disabled>
+                        <span class="btn-icon">✅</span>
+                        <span>Clear All</span>
+                    </button>
+                </div>
             </div>
+            <!-- Dropdown removed as requested -->
         </div>
 
         <!-- Dashboard Grid -->
         <div class="dashboard-grid">
-            <!-- Map Card -->
-            <div class="card">
-                <div class="card-header">
-                    <h2 class="card-title">
-                        <span class="card-icon">🗺️</span>
-                        Live Traffic Map
-                    </h2>
+            <!-- Top Row: Map and Speed Monitor Side-by-Side -->
+            <div class="split-view">
+                <!-- Map Card -->
+                <div class="card map-card">
+                    <div class="card-header">
+                        <h2 class="card-title">
+                            <span class="card-icon">🗺️</span>
+                            Live Traffic Map
+                        </h2>
+                    </div>
+                    <div id="map"></div>
                 </div>
-                <div id="map"></div>
-            </div>
 
-            <!-- Speed Chart Card -->
-            <div class="card">
-                <div class="card-header">
-                    <h2 class="card-title">
-                        <span class="card-icon">📈</span>
-                        Real-Time Speed Monitor
-                    </h2>
-                </div>
-                <div class="chart-container">
-                    <canvas id="speedChart"></canvas>
-                </div>
-            </div>
-
-            <!-- Alerts Card -->
-            <div class="card">
-                <div class="card-header">
-                    <h2 class="card-title">
-                        <span class="card-icon">🚨</span>
-                        Accident Alerts
-                    </h2>
-                </div>
-                <div class="alerts-container" id="alertsContainer">
-                    <div class="empty-state">
-                        <div class="empty-state-icon">✅</div>
-                        <p>No accidents detected</p>
+                <!-- Speed Chart Card -->
+                <div class="card chart-card">
+                    <div class="card-header">
+                        <h2 class="card-title">
+                            <span class="card-icon">📈</span>
+                            Real-Time Speed Monitor
+                        </h2>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="speedChart"></canvas>
                     </div>
                 </div>
             </div>
 
-            <!-- Statistics Card -->
-            <div class="card">
-                <div class="card-header">
-                    <h2 class="card-title">
-                        <span class="card-icon">📊</span>
-                        Statistics
-                    </h2>
+            <!-- Bottom Row: Alerts and Stats -->
+            <div class="bottom-grid">
+                <!-- Alerts Card -->
+                <div class="card alerts-card">
+                    <div class="card-header">
+                        <h2 class="card-title">
+                            <span class="card-icon">🚨</span>
+                            Accident Alerts
+                        </h2>
+                    </div>
+                    <div class="alerts-container" id="alertsContainer">
+                        <div class="empty-state">
+                            <div class="empty-state-icon">✅</div>
+                            <p>No accidents detected</p>
+                        </div>
+                    </div>
                 </div>
-                <div class="stats-grid">
-                    <div class="stat-item">
-                        <div class="stat-label">Current Speed</div>
-                        <div class="stat-value" id="currentSpeed">--</div>
+
+                <!-- Statistics Card -->
+                <div class="card stats-card">
+                    <div class="card-header">
+                        <h2 class="card-title">
+                            <span class="card-icon">📊</span>
+                            System Statistics
+                        </h2>
                     </div>
-                    <div class="stat-item">
-                        <div class="stat-label">Predicted Speed</div>
-                        <div class="stat-value" id="predictedSpeed">--</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-label">CUSUM Statistic</div>
-                        <div class="stat-value" id="cusumStat">--</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-label">Active Accidents</div>
-                        <div class="stat-value danger" id="activeAccidents">0</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-label">Detection Confidence</div>
-                        <div class="stat-value" id="confidence">--</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-label">SPRT Ratio</div>
-                        <div class="stat-value" id="sprtRatio">--</div>
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <div class="stat-label">Current Speed (Avg)</div>
+                            <div class="stat-value" id="currentSpeed">--</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-label">Predicted Speed (Avg)</div>
+                            <div class="stat-value" id="predictedSpeed">--</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-label">CUSUM Statistic</div>
+                            <div class="stat-value" id="cusumStat">--</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-label">Active Accidents</div>
+                            <div class="stat-value danger" id="activeAccidents">0</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-label">Detection Confidence</div>
+                            <div class="stat-value" id="confidence">--</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-label">SPRT Ratio</div>
+                            <div class="stat-value" id="sprtRatio">--</div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -141,14 +154,115 @@
     <!-- Scripts -->
     <!-- Socket.IO -->
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
-    
+
     <!-- Leaflet JS for Map -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    
+
+    <!-- Help Modal -->
+    <div id="helpModal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <div class="modal-header">
+                <h2><i class="fas fa-book"></i> System Theory & Algorithms</h2>
+                <p>Detailed explanation of the statistical methods and data simulation used in this project.</p>
+            </div>
+
+            <div class="modal-body">
+                <div class="theory-section">
+                    <h3>1. Sequential Estimation: ARIMA(1,0,1)</h3>
+                    <p>The system utilizes an <strong>ARIMA(1,0,1)</strong> (AutoRegressive Integrated Moving Average)
+                        model to establish a dynamic baseline for vehicle speeds. Unlike static thresholds, this model
+                        adapts to the momentum and recent history of the traffic flow.</p>
+
+                    <div class="formula-container">
+                        <div class="depth-info">
+                            <p><strong>Autoregressive (p=1):</strong> Captures the relationship between an observation
+                                and its immediately preceding value, essentially modeling the "momentum" of traffic
+                                speed.</p>
+                            <p><strong>Integrated (d=0):</strong> Indicates the data is stationary; no differencing is
+                                required as we model fluctuations around a steady mean.</p>
+                            <p><strong>Moving Average (q=1):</strong> Smooths out the series by considering the
+                                dependency between an observation and the residual error of the previous step (MA
+                                component).</p>
+                            <p class="math"><strong>Equation:</strong> $y_t = c + \phi_1 y_{t-1} + \theta_1
+                                \epsilon_{t-1} + \epsilon_t$</p>
+                            <p>The difference between the actual speed ($y_t$) and the model's prediction ($\hat{y}_t$)
+                                gives us the <em>Residual</em>, which serves as the primary indicator for anomaly
+                                detection.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="theory-section">
+                    <h3>2. Change Detection: CUSUM (Cumulative Sum)</h3>
+                    <p>The <strong>CUSUM</strong> algorithm is a powerful sequential analysis technique designed to
+                        detect <em>persistent</em> shifts in the mean. While a single low speed might be a random tap on
+                        the brakes, CUSUM accumulates evidence over time, making it highly sensitive to the sustained
+                        speed drops characteristic of accidents.</p>
+
+                    <div class="formula-container">
+                        <div class="depth-info">
+                            <p>We maintain a running tally, $S_t$, of the cumulative deviations from the expected normal
+                                speed $\mu_0$:</p>
+                            <p class="math"><strong>Recurrence:</strong> $S_t = \max(0, S_{t-1} + (\mu_0 - y_t -
+                                \delta))$</p>
+                            <ul>
+                                <li><strong>$\delta$ (Drift):</strong> A tolerance parameter that allows for minor
+                                    fluctuations without increasing the sum.</li>
+                                <li><strong>Detection:</strong> An alarm is triggered if $S_t$ exceeds a defined
+                                    threshold (e.g., 5.0). This indicates that the probability of a fundamental change
+                                    in traffic state is high.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="theory-section">
+                    <h3>3. Hypothesis Testing: Sequential Probability Ratio Test (SPRT)</h3>
+                    <p>The <strong>SPRT</strong>, developed by Abraham Wald, is an optimal test for deciding between two
+                        competing hypotheses as data arrives. It minimizes the amount of data needed to reach a
+                        high-confidence decision.</p>
+
+                    <div class="formula-container">
+                        <div class="depth-info">
+                            <ul>
+                                <li><strong>$H_0$ (Null Hypothesis):</strong> Traffic is normal ($\mu \approx 60$).</li>
+                                <li><strong>$H_1$ (Alternative Hypothesis):</strong> Accident Condition ($\mu \approx
+                                    20$).</li>
+                            </ul>
+                            <p>We calculate the <strong>Log-Likelihood Ratio</strong> ($L_t$):</p>
+                            <p class="math">$L_t = L_{t-1} + \log \left( \frac{P(y_t | H_1)}{P(y_t | H_0)} \right)$</p>
+                            <p>As soon as $L_t$ crosses an upper threshold, the system declares an "Accident" state.
+                                This approach is much faster and more statistically sound than waiting for a fixed
+                                window of time to pass.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="theory-section">
+                    <h3>4. Data Generation & Simulation</h3>
+                    <p>The dashboard simulates a realistic stochastic traffic environment using a generative model:</p>
+                    <ul>
+                        <li><strong>Standard Flow:</strong> Initialized with Gaussian noise $N(60, 5)$ to represent
+                            fluid highway travel.</li>
+                        <li><strong>Accident Injections:</strong> Accidents are modeled as sudden shifts in parameters,
+                            dropping the mean speed to $N(20, 10)$ and persisting for a random duration (representing
+                            response and recovery time).</li>
+                        <li><strong>Real-time Updates:</strong> Data is pushed via WebSockets to mimic the real-time
+                            ingest of GPS pings from a modern telematics platform.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    
+    <script
+        src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+
     <!-- Custom JS -->
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
+
 </html>

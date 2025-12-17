@@ -10,6 +10,7 @@ class Config:
     # Simulation settings
     SIMULATION_SPEED = 1.0  # 1x real-time
     UPDATE_INTERVAL = 2.0  # seconds between updates
+    NUM_CARS = 2   # Number of simulated cars
     NOISE_LEVEL = 5.0  # GPS noise in mph
     ACCIDENT_PROBABILITY = 0.03  # Probability of accident per interval (3% = ~1 accident per 67 seconds)
     
@@ -18,7 +19,7 @@ class Config:
     NORMAL_SPEED_STD = 10.0  # mph
     ACCIDENT_SPEED_MEAN = 15.0  # mph during accident
     ACCIDENT_SPEED_STD = 5.0  # mph
-    ACCIDENT_DURATION_MEAN = 120.0  # seconds
+    ACCIDENT_DURATION_MEAN = 60.0  # seconds, reduced for demo
     ACCIDENT_DURATION_STD = 30.0  # seconds
     
     # Detection algorithm parameters

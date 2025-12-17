@@ -6,28 +6,57 @@
 // Global variables
 let socket;
 let map;
-let marker;
-let circle;
 let speedChart;
 let isMonitoring = false;
+let selectedCarId = null;
+
+// Map elements
+const carMarkers = {}; // { carId: marker }
+const carCircles = {}; // { carId: circle }
 
 // Chart data
-const maxDataPoints = 30;
-const chartData = {
-    labels: [],
-    speeds: [],
-    predicted: [],
-    cusum: []
+// distinct colors for cars
+const CAR_COLORS = {
+    'Car1': '#3b82f6', // Bright Blue
+    'Car2': '#10b981', // Emerald Green
+    'Car3': '#f59e0b', // Amber
+    'Car4': '#ec4899', // Pink
+    'Car5': '#8b5cf6'  // Violet
 };
+const DEFAULT_COLOR = '#64748b'; // Slate
+
+function getCarColor(carId) {
+    return CAR_COLORS[carId] || DEFAULT_COLOR;
+}
 
 /**
  * Initialize the application
  */
 document.addEventListener('DOMContentLoaded', () => {
-    initializeMap();
-    initializeChart();
-    initializeSocket();
-    initializeControls();
+
+    try {
+        initializeSocket();
+    } catch (e) {
+        console.error('Socket init failed:', e);
+    }
+
+    try {
+        initializeMap();
+    } catch (e) {
+        console.error('Map init failed:', e);
+    }
+
+    try {
+        initializeChart();
+    } catch (e) {
+        console.error('Chart init failed:', e);
+    }
+
+    try {
+        initializeControls();
+    } catch (e) {
+        console.error('Controls init failed:', e);
+    }
 });
 
 /**
@@ -35,140 +64,68 @@ document.addEventListener('DOMContentLoaded', () => {
  */
 function initializeMap() {
     // Create map centered on default location
-    map = L.map('map').setView([37.7749, -122.4194], 13);
-    
+    map = L.map('map', {
+        zoomControl: false // Cleaner look
+    }).setView([37.7749, -122.4194], 14);
+
+    // Add zoom control to top-right
+    L.control.zoom({
+        position: 'topright'
+    }).addTo(map);
+
     // Add tile layer (dark theme)
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
         attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
         maxZoom: 19
     }).addTo(map);
-    
-    // Add marker for road segment
-    marker = L.marker([37.7749, -122.4194]).addTo(map);
-    marker.bindPopup('<b>Highway 101</b><br>Monitoring Point');
-    
-    // Add circle to show monitoring area
-    circle = L.circle([37.7749, -122.4194], {
-        color: '#10b981',
-        fillColor: '#10b981',
-        fillOpacity: 0.2,
-        radius: 500
-    }).addTo(map);
 }
 
 /**
- * Initialize Chart.js speed chart
+ * Initialize Chart.js chart
  */
 function initializeChart() {
     const ctx = document.getElementById('speedChart').getContext('2d');
-    
     speedChart = new Chart(ctx, {
         type: 'line',
         data: {
-            labels: chartData.labels,
-            datasets: [
-                {
-                    label: 'Actual Speed',
-                    data: chartData.speeds,
-                    borderColor: '#00d4ff',
-                    backgroundColor: 'rgba(0, 212, 255, 0.1)',
-                    borderWidth: 2,
-                    tension: 0.4,
-                    fill: true
-                },
-                {
-                    label: 'Predicted Speed (ARIMA)',
-                    data: chartData.predicted,
-                    borderColor: '#7c3aed',
-                    backgroundColor: 'transparent',
-                    borderWidth: 2,
-                    borderDash: [5, 5],
-                    tension: 0.4,
-                    fill: false
-                },
-                {
-                    label: 'CUSUM Statistic',
-                    data: chartData.cusum,
-                    borderColor: '#f59e0b',
-                    backgroundColor: 'transparent',
-                    borderWidth: 1,
-                    tension: 0.4,
-                    fill: false,
-                    yAxisID: 'y1'
-                }
-            ]
+            datasets: []
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            animation: false,
             interaction: {
                 mode: 'index',
-                intersect: false
+                intersect: false,
             },
             plugins: {
-                legend: {
+                title: {
                     display: true,
-                    labels: {
-                        color: '#94a3b8',
-                        font: {
-                            size: 11
-                        }
-                    }
+                    text: 'Real-Time Vehicle Speeds',
+                    color: '#e2e8f0'
                 },
-                tooltip: {
-                    backgroundColor: 'rgba(26, 35, 71, 0.9)',
-                    titleColor: '#ffffff',
-                    bodyColor: '#94a3b8',
-                    borderColor: 'rgba(255, 255, 255, 0.1)',
-                    borderWidth: 1
+                legend: {
+                    labels: { color: '#e2e8f0' }
                 }
             },
             scales: {
                 x: {
-                    display: true,
-                    grid: {
-                        color: 'rgba(255, 255, 255, 0.05)'
+                    type: 'time',
+                    time: {
+                        unit: 'second',
+                        displayFormats: { second: 'HH:mm:ss' }
                     },
-                    ticks: {
-                        color: '#64748b',
-                        maxRotation: 0,
-                        autoSkip: true,
-                        maxTicksLimit: 8
-                    }
+                    grid: { color: '#334155' },
+                    ticks: { color: '#94a3b8' },
+                    title: { display: true, text: 'Time', color: '#94a3b8' }
                 },
                 y: {
-                    display: true,
-                    position: 'left',
-                    title: {
-                        display: true,
-                        text: 'Speed (mph)',
-                        color: '#94a3b8'
-                    },
-                    grid: {
-                        color: 'rgba(255, 255, 255, 0.05)'
-                    },
-                    ticks: {
-                        color: '#64748b'
-                    }
-                },
-                y1: {
-                    display: true,
-                    position: 'right',
-                    title: {
-                        display: true,
-                        text: 'CUSUM',
-                        color: '#94a3b8'
-                    },
-                    grid: {
-                        drawOnChartArea: false
-                    },
-                    ticks: {
-                        color: '#64748b'
-                    }
+                    beginAtZero: true,
+                    max: 140,
+                    grid: { color: '#334155' },
+                    ticks: { color: '#94a3b8' },
+                    title: { display: true, text: 'Speed (km/h)', color: '#94a3b8' }
                 }
-            },
-            animation: {
-                duration: 300
             }
         }
     });
@@ -179,29 +136,27 @@ function initializeChart() {
  */
 function initializeSocket() {
     socket = io();
-    
+
     socket.on('connect', () => {
-        console.log('Connected to server');
-        showNotification('Connected to server', 'System ready', 'success');
+        showNotification('Connected', 'System ready', 'success');
     });
-    
+
     socket.on('disconnect', () => {
-        console.log('Disconnected from server');
         showNotification('Disconnected', 'Connection lost', 'danger');
     });
-    
+
     socket.on('traffic_update', (data) => {
         updateDashboard(data);
     });
-    
+
     socket.on('accident_alert', (accident) => {
         handleAccidentAlert(accident);
     });
-    
+
     socket.on('accident_cleared', (data) => {
         handleAccidentCleared(data);
     });
-    
+
     socket.on('simulation_status', (data) => {
         isMonitoring = data.running;
         updateControlButtons();
@@ -212,253 +167,363 @@ function initializeSocket() {
  * Initialize control buttons
  */
 function initializeControls() {
-    document.getElementById('startBtn').addEventListener('click', startMonitoring);
-    document.getElementById('stopBtn').addEventListener('click', stopMonitoring);
-    document.getElementById('injectBtn').addEventListener('click', injectAccident);
-    document.getElementById('clearBtn').addEventListener('click', clearAccident);
+    // Only bind if elements exist
+    const startBtn = document.getElementById('startBtn');
+    if (startBtn) {
+        startBtn.addEventListener('click', () => {
+            // Optimistic UI Update
+            startBtn.disabled = true;
+            startBtn.innerHTML = '<span class="spinner"></span> Starting...';
+            document.getElementById('stopBtn').disabled = false;
+            document.getElementById('injectBtn').disabled = false;
+            document.getElementById('clearBtn').disabled = false;
+
+            socket.emit('start_simulation');
+        });
+    }
+
+    const stopBtn = document.getElementById('stopBtn');
+    if (stopBtn) {
+        stopBtn.addEventListener('click', () => {
+            // Optimistic UI Update
+            stopBtn.disabled = true;
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('startBtn').innerHTML = '<span class="btn-icon">▶️</span> <span>Start Simulation</span>';
+            document.getElementById('injectBtn').disabled = true;
+            document.getElementById('clearBtn').disabled = true;
+
+            socket.emit('stop_simulation');
+        });
+    }
+
+    const injectBtn = document.getElementById('injectBtn');
+    if (injectBtn) {
+        injectBtn.addEventListener('click', () => {
+            // Visual feedback
+            const originalText = injectBtn.innerHTML;
+            injectBtn.innerHTML = '⚠️ Injecting...';
+            setTimeout(() => { injectBtn.innerHTML = originalText; }, 1000);
+
+            injectAccident();
+        });
+    }
+
+    const clearBtn = document.getElementById('clearBtn');
+    if (clearBtn) {
+        clearBtn.addEventListener('click', () => {
+            // Visual feedback
+            const originalText = clearBtn.innerHTML;
+            clearBtn.innerHTML = '✅ Clearing...';
+            setTimeout(() => { clearBtn.innerHTML = originalText; }, 1000);
+
+            clearAccident();
+        });
+    }
+
+    // Modal Logic
+    const modal = document.getElementById('helpModal');
+    const btn = document.getElementById('helpBtn');
+    const closeBtns = document.getElementsByClassName('close-modal');
+
+    if (modal && btn) {
+        btn.onclick = (e) => {
+            e.preventDefault();
+            modal.style.display = 'block';
+        }
+    }
+
+    if (closeBtns.length > 0) {
+        for (let span of closeBtns) {
+            span.onclick = () => {
+                modal.style.display = 'none';
+            }
+        }
+    }
+
+    window.onclick = (event) => {
+        if (event.target === modal) {
+            modal.style.display = 'none';
+        }
+    }
 }
 
-/**
- * Start monitoring
- */
-function startMonitoring() {
-    socket.emit('start_simulation');
-    isMonitoring = true;
-    updateControlButtons();
-    showNotification('Monitoring Started', 'Real-time traffic monitoring active', 'success');
-}
 
 /**
- * Stop monitoring
- */
-function stopMonitoring() {
-    socket.emit('stop_simulation');
-    isMonitoring = false;
-    updateControlButtons();
-    showNotification('Monitoring Stopped', 'Traffic monitoring paused', 'warning');
-}
-
-/**
- * Inject accident for demo
+ * Inject accident
  */
 function injectAccident() {
+    const payload = { duration: 120 };
+    if (selectedCarId) payload.car_id = selectedCarId;
+
     fetch('/api/inject-accident', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ duration: 120 })
+        body: JSON.stringify(payload)
     })
-    .then(response => response.json())
-    .then(data => {
-        showNotification('Accident Injected', 'Demo accident scenario activated', 'warning');
-    });
+        .then(r => r.json())
+        .then(d => showNotification('Accident Injected', `Target: ${d.car_id || 'Random'}`, 'warning'));
 }
 
 /**
- * Clear accident
+ * Clear accidents (All cars)
  */
 function clearAccident() {
+    // Clear all by not sending a specific car_id
+    const payload = {};
+
     fetch('/api/clear-accident', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
     })
-    .then(response => response.json())
-    .then(data => {
-        showNotification('Accident Cleared', 'Manually cleared accident', 'success');
+        .then(r => r.json())
+        .then(d => showNotification('System Reset', 'All accident states cleared', 'success'));
+}
+
+function updateControlButtons() {
+    // Only update if we want to sync with server state, but keep optimistic updates priority if needed.
+    // Actually, server state confirmation is good to ensure we don't desync.
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const injectBtn = document.getElementById('injectBtn');
+    const clearBtn = document.getElementById('clearBtn');
+
+    if (startBtn && stopBtn) {
+        if (isMonitoring) {
+            startBtn.disabled = true;
+            startBtn.innerHTML = '<span class="spinner"></span> Running';
+            stopBtn.disabled = false;
+            if (injectBtn) injectBtn.disabled = false;
+            if (clearBtn) clearBtn.disabled = false;
+        } else {
+            startBtn.disabled = false;
+            startBtn.innerHTML = '<span class="btn-icon">▶️</span> <span>Start Simulation</span>';
+            stopBtn.disabled = true;
+            if (injectBtn) injectBtn.disabled = true;
+            if (clearBtn) injectBtn.disabled = true;
+        }
+    }
+}
+
+/**
+ * Update dashboard
+ */
+function updateDashboard(data) {
+    const cars = data.cars;
+
+    // Auto-select first car if none selected or if selected is gone
+    if (cars.length > 0) {
+        const stillExists = cars.find(c => c.car_id === selectedCarId);
+        if (!selectedCarId || !stillExists) {
+            selectedCarId = cars[0].car_id;
+        }
+    }
+
+    const activeAccidentsElem = document.getElementById('activeAccidents');
+    if (activeAccidentsElem) activeAccidentsElem.textContent = data.active_accidents.length;
+
+    updateMap(cars);
+    updateChart(cars); // Pass all cars to chart
+
+    // Update Stats for SELECTED car only
+    if (selectedCarId) {
+        const carData = cars.find(c => c.car_id === selectedCarId);
+        if (carData) {
+            updateStats(carData);
+        }
+    }
+
+    // Update Badge
+    const activeCount = data.active_accidents.length;
+    const badge = document.getElementById('statusBadge');
+    if (badge) {
+        if (activeCount > 0) {
+            badge.classList.add('alert');
+            badge.innerHTML = `<span class="status-dot"></span>🚨 ${activeCount} Alert(s)`;
+            // Ensure dot is visible
+            badge.querySelector('.status-dot').style.display = 'inline-block';
+        } else {
+            badge.classList.remove('alert');
+            // Hide text when normal, just show dot or nothing if requested
+            badge.innerHTML = `<span class="status-dot"></span>System Normal`;
+        }
+    }
+}
+
+/**
+ * Update Map
+ */
+function updateMap(cars) {
+    // Check for global accident state
+    const anyAccident = cars.some(car => car.accident_active || car.accident_detected);
+
+    cars.forEach(car => {
+        const carId = car.car_id;
+        const lat = car.location?.lat || 37.7749;
+        const lon = car.location?.lon || -122.4194;
+        // Individual accident state for markers (optional to keep, or sync with global?)
+        // User asked for "color of location" to be red if anyone has accident.
+        const isAccident = car.accident_active || car.accident_detected;
+
+        // Custom Markers
+        let iconUrl = 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png';
+        if (isAccident) iconUrl = 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png';
+        else if (carId === selectedCarId) iconUrl = 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png';
+
+        if (carMarkers[carId]) {
+            carMarkers[carId].setLatLng([lat, lon]);
+            carMarkers[carId].setIcon(createIcon(iconUrl));
+            // Update popup content dynamically
+            const popupContent = `
+                <div style="font-family: Inter, sans-serif;">
+                    <b>${carId}</b><br>
+                    <span style="color: ${isAccident ? '#ef4444' : '#10b981'}">
+                        ${car.speed.toFixed(1)} mph
+                    </span>
+                </div>
+            `;
+            const popup = carMarkers[carId].getPopup();
+            if (popup) popup.setContent(popupContent);
+        } else {
+            carMarkers[carId] = L.marker([lat, lon], { icon: createIcon(iconUrl) })
+                .addTo(map)
+                .bindPopup(`<b>${carId}</b>`);
+
+            // Add click listener to select car
+            carMarkers[carId].on('click', () => {
+                selectedCarId = carId;
+            });
+        }
+
+        if (carCircles[carId]) {
+            carCircles[carId].setLatLng([lat, lon]);
+            // Logic: Red if ANY accident, Green if ALL clear.
+            carCircles[carId].setStyle({ color: anyAccident ? '#ef4444' : '#10b981' });
+        } else {
+            // Initial style
+            carCircles[carId] = L.circle([lat, lon], {
+                radius: 200,
+                fillOpacity: 0.1,
+                weight: 1,
+                color: anyAccident ? '#ef4444' : '#10b981'
+            }).addTo(map);
+        }
+    });
+}
+
+function createIcon(url) {
+    return L.icon({
+        iconUrl: url,
+        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+        iconSize: [25, 41],
+        iconAnchor: [12, 41],
+        popupAnchor: [1, -34],
+        shadowSize: [41, 41]
     });
 }
 
 /**
- * Update control buttons state
+ * Update Stats
  */
-function updateControlButtons() {
-    document.getElementById('startBtn').disabled = isMonitoring;
-    document.getElementById('stopBtn').disabled = !isMonitoring;
-    document.getElementById('injectBtn').disabled = !isMonitoring;
-    document.getElementById('clearBtn').disabled = !isMonitoring;
+function updateStats(data) {
+    const setText = (id, txt) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = txt;
+    };
+
+    setText('currentSpeed', `${data.speed.toFixed(1)} mph`);
+    setText('predictedSpeed', `${data.predicted_speed.toFixed(1)} mph`);
+
+    const predEl = document.getElementById('predictedSpeed');
+    if (predEl) predEl.style.fontSize = "1.75rem";
+
+    setText('cusumStat', data.cusum_stat.toFixed(2));
+    setText('sprtRatio', data.sprt_ratio.toFixed(2));
+    setText('confidence', `${(data.confidence * 100).toFixed(0)}%`);
 }
 
 /**
- * Update dashboard with new data
+ * Update Chart (Scatter)
  */
-function updateDashboard(data) {
-    // Update statistics
-    document.getElementById('currentSpeed').textContent = `${data.speed} mph`;
-    document.getElementById('predictedSpeed').textContent = `${data.predicted_speed} mph`;
-    document.getElementById('cusumStat').textContent = data.cusum_stat.toFixed(2);
-    document.getElementById('sprtRatio').textContent = data.sprt_ratio.toFixed(2);
-    document.getElementById('confidence').textContent = `${(data.confidence * 100).toFixed(0)}%`;
-    document.getElementById('activeAccidents').textContent = data.active_accidents.length;
-    
-    // Update status badge
-    const statusBadge = document.getElementById('statusBadge');
-    const statusText = document.getElementById('statusText');
-    
-    if (data.accident_detected) {
-        statusBadge.classList.add('alert');
-        statusText.textContent = '🚨 Accident Detected';
-    } else {
-        statusBadge.classList.remove('alert');
-        statusText.textContent = '✅ All Clear';
-    }
-    
-    // Update map
-    if (data.accident_detected) {
-        circle.setStyle({ color: '#ef4444', fillColor: '#ef4444' });
-        marker.setIcon(L.icon({
-            iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
-            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-            iconSize: [25, 41],
-            iconAnchor: [12, 41],
-            popupAnchor: [1, -34],
-            shadowSize: [41, 41]
-        }));
-    } else {
-        circle.setStyle({ color: '#10b981', fillColor: '#10b981' });
-        marker.setIcon(L.icon({
-            iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
-            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-            iconSize: [25, 41],
-            iconAnchor: [12, 41],
-            popupAnchor: [1, -34],
-            shadowSize: [41, 41]
-        }));
-    }
-    
-    // Update chart
-    updateChart(data);
-}
+function updateChart(cars) {
+    const now = new Date();
 
-/**
- * Update speed chart
- */
-function updateChart(data) {
-    const timestamp = new Date(data.timestamp).toLocaleTimeString();
-    
-    // Add new data
-    chartData.labels.push(timestamp);
-    chartData.speeds.push(data.speed);
-    chartData.predicted.push(data.predicted_speed);
-    chartData.cusum.push(data.cusum_stat);
-    
-    // Keep only last N points
-    if (chartData.labels.length > maxDataPoints) {
-        chartData.labels.shift();
-        chartData.speeds.shift();
-        chartData.predicted.shift();
-        chartData.cusum.shift();
-    }
-    
-    // Update chart
+    cars.forEach(car => {
+        let dataset = speedChart.data.datasets.find(ds => ds.label === car.car_id);
+        if (!dataset) {
+            const color = getCarColor(car.car_id);
+            dataset = {
+                label: car.car_id,
+                data: [],
+                borderColor: color,
+                backgroundColor: color,
+                pointRadius: 3,
+                pointHoverRadius: 6,
+                showLine: false // Pure scatter
+            };
+            speedChart.data.datasets.push(dataset);
+        }
+
+        dataset.data.push({
+            x: now,
+            y: car.speed
+        });
+
+        // Keep max 50 points per car
+        if (dataset.data.length > 50) {
+            dataset.data.shift();
+        }
+    });
+
     speedChart.update('none');
 }
 
-/**
- * Handle accident alert
- */
 function handleAccidentAlert(accident) {
-    // Show notification
-    showNotification(
-        '⚠️ ACCIDENT DETECTED',
-        `Location: Highway 101 | Confidence: ${(accident.confidence * 100).toFixed(0)}%`,
-        'danger'
-    );
-    
-    // Add to alerts panel
+    showNotification('⚠️ ACCIDENT DETECTED', `Vehicle: ${accident.car_id}`, 'warning');
     addAlertToPanel(accident);
-    
-    // Play alert sound (optional)
-    // new Audio('/static/sounds/alert.mp3').play();
 }
 
-/**
- * Handle accident cleared
- */
 function handleAccidentCleared(data) {
-    showNotification(
-        '✅ ACCIDENT CLEARED',
-        'Traffic has returned to normal',
-        'success'
-    );
-    
-    // Update alert in panel
+    showNotification('✅ CLEARED', `Car: ${data.car_id}`, 'success');
     updateAlertInPanel(data.id, 'cleared');
 }
 
-/**
- * Add alert to alerts panel
- */
 function addAlertToPanel(accident) {
     const container = document.getElementById('alertsContainer');
-    
-    // Remove empty state if exists
+    if (!container) return;
+
     const emptyState = container.querySelector('.empty-state');
-    if (emptyState) {
-        emptyState.remove();
-    }
-    
-    // Create alert element
-    const alertEl = document.createElement('div');
-    alertEl.className = 'alert-item';
-    alertEl.id = `alert-${accident.id}`;
-    
-    const methods = accident.detection_methods.map(m => 
-        `<span class="method-tag">${m}</span>`
-    ).join('');
-    
-    alertEl.innerHTML = `
-        <div class="alert-header">
-            <span class="alert-title">⚠️ Accident Detected</span>
-            <span class="alert-badge active">ACTIVE</span>
-        </div>
-        <div class="alert-details">
-            <div>Location: Highway 101, Mile 23.5</div>
-            <div>Detected: ${new Date(accident.detected_at).toLocaleTimeString()}</div>
-            <div>Confidence: ${(accident.confidence * 100).toFixed(0)}%</div>
-            <div class="alert-methods">${methods}</div>
-        </div>
-    `;
-    
-    container.insertBefore(alertEl, container.firstChild);
+    if (emptyState) emptyState.remove();
+
+    const div = document.createElement('div');
+    div.className = 'alert-item';
+    div.id = `alert-${accident.id}`;
+    div.innerHTML = `<div style="display:flex; justify-content:space-between; align-items:center;">
+        <strong>⚠️ ${accident.car_id}</strong>
+        <span style="font-size:0.75rem; background:#ef4444; color:white; padding:2px 6px; border-radius:4px;">ACTIVE</span>
+    </div>`;
+    container.insertBefore(div, container.firstChild);
 }
 
-/**
- * Update alert in panel
- */
-function updateAlertInPanel(accidentId, status) {
-    const alertEl = document.getElementById(`alert-${accidentId}`);
-    if (alertEl) {
-        alertEl.classList.add('cleared');
-        const badge = alertEl.querySelector('.alert-badge');
-        badge.textContent = 'CLEARED';
-        badge.classList.remove('active');
-        badge.classList.add('cleared');
+function updateAlertInPanel(id, status) {
+    const el = document.getElementById(`alert-${id}`);
+    if (el) {
+        const badge = el.querySelector('span');
+        if (badge) {
+            badge.textContent = 'CLEARED';
+            badge.style.background = '#10b981';
+        }
+        el.classList.add('cleared');
     }
 }
 
-/**
- * Show notification toast
- */
-function showNotification(title, message, type = 'info') {
-    const container = document.getElementById('notificationContainer');
-    
-    const notification = document.createElement('div');
-    notification.className = `notification ${type}`;
-    
-    const icon = type === 'success' ? '✅' : type === 'danger' ? '⚠️' : 'ℹ️';
-    
-    notification.innerHTML = `
-        <div class="notification-header">
-            <span class="notification-icon">${icon}</span>
-            <span class="notification-title">${title}</span>
-        </div>
-        <div class="notification-body">${message}</div>
-    `;
-    
-    container.appendChild(notification);
-    
-    // Auto-remove after 5 seconds
-    setTimeout(() => {
-        notification.style.animation = 'slideInRight 0.3s ease reverse';
-        setTimeout(() => notification.remove(), 300);
-    }, 5000);
+function showNotification(title, msg, type = 'info') {
+    const c = document.getElementById('notificationContainer');
+    if (!c) return;
+
+    const n = document.createElement('div');
+    n.className = `notification ${type}`;
+    n.innerHTML = `<strong>${title}</strong><br>${msg}`;
+    c.appendChild(n);
+    setTimeout(() => { n.remove(); }, 4000);
 }

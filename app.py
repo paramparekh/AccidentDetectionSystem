@@ -40,71 +40,67 @@ def data_stream_worker():
     
     while simulation_running:
         try:
-            # Generate speed data
-            speed_data = simulator.generate_speed_data()
+            # Generate speed data for ALL cars (returns list)
+            speed_data_list = simulator.generate_speed_data()
             
             # Generate user report (may be None)
             user_report = simulator.generate_user_report()
             
-            # Process through detector
-            detection_result = detector.process_speed(speed_data)
+            # Process through detector (returns list of results)
+            detection_results = detector.process_speed(speed_data_list)
             
-            # Check for new accident
-            if detection_result['accident_detected'] and not any(
-                a['id'] == detection_result['accident_id'] for a in active_accidents
-            ):
-                # New accident detected
-                accident = {
-                    'id': detection_result['accident_id'],
-                    'location': speed_data['location'],
-                    'detected_at': detection_result['timestamp'],
-                    'initial_speed': speed_data['speed'],
-                    'detection_methods': [],
-                    'confidence': detection_result['confidence'],
-                    'status': 'active'
-                }
+            # Check each car for new accidents
+            for i, result in enumerate(detection_results):
+                car_id = result['car_id']
                 
-                # Add detection methods
-                if detection_result['cusum_alert']:
-                    accident['detection_methods'].append('CUSUM')
-                if detection_result['sprt_alert']:
-                    accident['detection_methods'].append('SPRT')
-                if detection_result['ph_alert']:
-                    accident['detection_methods'].append('Page-Hinkley')
-                if user_report:
-                    accident['detection_methods'].append('User Report')
-                
-                active_accidents.append(accident)
-                
-                # Emit accident alert
-                socketio.emit('accident_alert', accident)
+                if result['accident_detected'] and not any(
+                    a['id'] == result['accident_id'] for a in active_accidents
+                ):
+                    # New accident detected for this car
+                    accident = {
+                        'id': result['accident_id'],
+                        'car_id': car_id,
+                        'location': speed_data_list[i]['location'],
+                        'detected_at': result['timestamp'],
+                        'initial_speed': result['speed'],
+                        'detection_methods': ['CUSUM', 'SPRT', 'Page-Hinkley'],  # Simplified
+                        'confidence': result['confidence'],
+                        'status': 'active'
+                    }
+                    
+                    if user_report and user_report.get('car_id') == car_id:
+                        accident['detection_methods'].append('User Report')
+                    
+                    active_accidents.append(accident)
+                    
+                    # Emit accident alert
+                    socketio.emit('accident_alert', accident)
             
             # Check for cleared accidents
-            if not detection_result['accident_active'] and active_accidents:
-                # Clear all active accidents
-                for accident in active_accidents:
+            cleared_ids = []
+            for accident in active_accidents:
+                # Find corresponding detection result
+                car_result = next((r for r in detection_results if r.get('accident_id') == accident['id']), None)
+                if car_result and not car_result['accident_active']:
                     accident['status'] = 'cleared'
-                    accident['cleared_at'] = detection_result['timestamp']
+                    accident['cleared_at'] = car_result['timestamp']
                     accident_history.append(accident)
+                    cleared_ids.append(accident['id'])
                     
                     # Emit clearance notification
                     socketio.emit('accident_cleared', {
                         'id': accident['id'],
-                        'cleared_at': detection_result['timestamp']
+                        'car_id': accident['car_id'],
+                        'cleared_at': car_result['timestamp']
                     })
-                
-                active_accidents.clear()
             
-            # Prepare update payload
+            # Remove cleared accidents
+            active_accidents[:] = [a for a in active_accidents if a['id'] not in cleared_ids]
+            
+            # Prepare update payload with ALL car data
             update_data = {
-                'timestamp': detection_result['timestamp'],
-                'speed': detection_result['speed'],
-                'predicted_speed': detection_result['predicted_speed'],
-                'cusum_stat': detection_result['cusum_stat'],
-                'sprt_ratio': detection_result['sprt_ratio'],
-                'ph_stat': detection_result['ph_stat'],
-                'accident_detected': detection_result['accident_detected'],
-                'confidence': detection_result['confidence'],
+                'timestamp': detection_results[0]['timestamp'] if detection_results else datetime.now().isoformat(),
+                'cars': detection_results,  # List of all car states
                 'active_accidents': active_accidents,
                 'user_report': user_report,
                 'simulator_status': simulator.get_status()
@@ -118,6 +114,8 @@ def data_stream_worker():
             
         except Exception as e:
             print(f"Error in data stream: {e}")
+            import traceback
+            traceback.print_exc()
             time.sleep(1)
 
 
@@ -157,15 +155,26 @@ def inject_accident():
     """Manually inject an accident for demonstration"""
     data = request.json or {}
     duration = data.get('duration', 120)
+    car_id = data.get('car_id', None)
     
-    result = simulator.inject_accident(duration)
+    result = simulator.inject_accident(duration, car_id)
     return jsonify(result)
 
 
 @app.route('/api/clear-accident', methods=['POST'])
 def clear_accident():
     """Manually clear current accident"""
-    result = simulator.clear_accident()
+    data = request.json or {}
+    car_id = data.get('car_id', None)
+    
+    result = simulator.clear_accident(car_id)
+    
+    # Synchronize detector state
+    if car_id:
+        detector.reset_car(car_id)
+    else:
+        detector.reset_all()
+        
     return jsonify(result)
 
 
