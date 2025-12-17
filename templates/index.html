@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Traffic Accident Detection System</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Leaflet CSS for Map -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/index.css') }}">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-content">
+            <div class="logo">
+                <span class="logo-icon">🚦</span>
+                <h1>Traffic Accident Detection</h1>
+            </div>
+            <div class="status-badge" id="statusBadge">
+                <span class="status-dot"></span>
+                <span id="statusText">All Clear</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <div class="container">
+        <!-- Control Panel -->
+        <div class="control-panel">
+            <div class="controls">
+                <button class="btn btn-primary" id="startBtn">
+                    <span>▶️</span>
+                    <span>Start Monitoring</span>
+                </button>
+                <button class="btn btn-danger" id="stopBtn" disabled>
+                    <span>⏸️</span>
+                    <span>Stop Monitoring</span>
+                </button>
+                <button class="btn btn-warning" id="injectBtn" disabled>
+                    <span>⚠️</span>
+                    <span>Inject Accident (Demo)</span>
+                </button>
+                <button class="btn btn-primary" id="clearBtn" disabled>
+                    <span>✅</span>
+                    <span>Clear Accident</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Dashboard Grid -->
+        <div class="dashboard-grid">
+            <!-- Map Card -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <span class="card-icon">🗺️</span>
+                        Live Traffic Map
+                    </h2>
+                </div>
+                <div id="map"></div>
+            </div>
+
+            <!-- Speed Chart Card -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <span class="card-icon">📈</span>
+                        Real-Time Speed Monitor
+                    </h2>
+                </div>
+                <div class="chart-container">
+                    <canvas id="speedChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Alerts Card -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <span class="card-icon">🚨</span>
+                        Accident Alerts
+                    </h2>
+                </div>
+                <div class="alerts-container" id="alertsContainer">
+                    <div class="empty-state">
+                        <div class="empty-state-icon">✅</div>
+                        <p>No accidents detected</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Statistics Card -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <span class="card-icon">📊</span>
+                        Statistics
+                    </h2>
+                </div>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-label">Current Speed</div>
+                        <div class="stat-value" id="currentSpeed">--</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Predicted Speed</div>
+                        <div class="stat-value" id="predictedSpeed">--</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">CUSUM Statistic</div>
+                        <div class="stat-value" id="cusumStat">--</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Active Accidents</div>
+                        <div class="stat-value danger" id="activeAccidents">0</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Detection Confidence</div>
+                        <div class="stat-value" id="confidence">--</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">SPRT Ratio</div>
+                        <div class="stat-value" id="sprtRatio">--</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Container -->
+    <div id="notificationContainer"></div>
+
+    <!-- Scripts -->
+    <!-- Socket.IO -->
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    
+    <!-- Leaflet JS for Map -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    
+    <!-- Custom JS -->
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
