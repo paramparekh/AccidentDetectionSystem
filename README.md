@@ -102,8 +102,8 @@ Traditional traffic monitoring systems rely on manual reports or delayed camera 
 
 ### Step 1: Clone the Repository
 ```bash
-git clone <your-repo-url>
-cd "Lab 5"
+git clone https://github.com/paramparekh/AccidentDetectionSystem.git
+cd AccidentDetectionSystem
 ```
 
 ### Step 2: Create Virtual Environment (Recommended)
@@ -412,3 +412,4 @@ MIT License - feel free to use this project for your portfolio!
 ---
 
 **⭐ Star this repo if you found it helpful!**
+
