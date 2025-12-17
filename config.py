@@ -11,7 +11,7 @@ class Config:
     SIMULATION_SPEED = 1.0  # 1x real-time
     UPDATE_INTERVAL = 2.0  # seconds between updates
     NOISE_LEVEL = 5.0  # GPS noise in mph
-    ACCIDENT_PROBABILITY = 0.05  # Probability of accident per interval (5% = ~1 accident per 40 seconds)
+    ACCIDENT_PROBABILITY = 0.03  # Probability of accident per interval (3% = ~1 accident per 67 seconds)
     
     # Traffic parameters
     NORMAL_SPEED_MEAN = 60.0  # mph
@@ -31,7 +31,7 @@ class Config:
     
     # Data buffer settings
     BUFFER_SIZE = 300  # seconds of history to keep
-    MIN_SAMPLES_FOR_DETECTION = 5  # minimum samples before detection
+    MIN_SAMPLES_FOR_DETECTION = 10  # minimum samples before detection (20 seconds warm-up)
     
     # Detection confidence
     MIN_CONFIDENCE = 0.7

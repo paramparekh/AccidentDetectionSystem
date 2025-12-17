@@ -204,8 +204,12 @@ class AccidentDetector:
         alerts = [cusum_alert, sprt_decision == 'accident', ph_alert]
         vote_count = sum(alerts)
         
-        # Determine if accident detected
-        accident_detected = vote_count >= Config.REQUIRE_VOTES
+        # WARM-UP PERIOD: Require minimum samples before detection
+        # This prevents false positives when system starts with insufficient data
+        has_enough_data = len(self.speed_history) >= Config.MIN_SAMPLES_FOR_DETECTION
+        
+        # Determine if accident detected (only if we have enough data)
+        accident_detected = has_enough_data and vote_count >= Config.REQUIRE_VOTES
         
         # Calculate confidence
         confidence = vote_count / 3.0
