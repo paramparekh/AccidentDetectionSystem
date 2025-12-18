@@ -2,6 +2,9 @@
 Flask Application for Real-Time Traffic Accident Detection
 """
 
+import eventlet
+eventlet.monkey_patch()
+
 from flask import Flask, render_template, jsonify, request
 from flask_socketio import SocketIO, emit
 from flask_cors import CORS
@@ -201,7 +204,7 @@ def handle_start_simulation():
         # Start background worker thread
         thread = threading.Thread(target=data_stream_worker, daemon=True)
         thread.start()
-        emit('simulation_status', {'running': True})
+        socketio.emit('simulation_status', {'running': True})
         print('Simulation started')
 
 

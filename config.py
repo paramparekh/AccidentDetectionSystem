@@ -1,11 +1,13 @@
+import os
+
 """
 Configuration settings for Traffic Accident Detection System
 """
 
 class Config:
     # Flask settings
-    SECRET_KEY = 'dev-secret-key-change-in-production'
-    DEBUG = True
+    SECRET_KEY = os.environ.get('SECRET_KEY', 'default-key-for-dev')
+    DEBUG = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
     
     # Simulation settings
     SIMULATION_SPEED = 1.0  # 1x real-time
