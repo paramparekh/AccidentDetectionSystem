@@ -25,6 +25,20 @@ A full-stack web application that detects and tracks traffic accidents in real-t
 
 ---
 
+## 📸 Screenshots
+
+| Dashboard View | Accident Detected |
+|:---:|:---:|
+| ![Dashboard](assets/screenshots/dashboard.png) | ![Accident Detected](assets/screenshots/accident_detected.png) |
+| **Real-time Monitoring** | **Instant Alert System** |
+
+| Simulation Running | Accident Cleared |
+|:---:|:---:|
+| ![Simulation](assets/screenshots/simulation.png) | ![Cleared](assets/screenshots/accident_cleared.png) |
+| **Live Data Streaming** | **Automatic Clearance** |
+
+---
+
 ## 🎯 Overview
 
 This project transforms traditional traffic accident detection from a batch processing problem into a **real-time monitoring system**. It demonstrates:
